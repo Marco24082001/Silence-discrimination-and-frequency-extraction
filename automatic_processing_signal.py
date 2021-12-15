@@ -12,11 +12,9 @@ from scipy.signal import find_peaks
 import math
 import os
 
-# matplotlib.use('qt')
-# %matplotlib qt
+# mormalize data from [-1, 1]
 def normalize(X):
     X = X.reshape(-1,)
-    # return X/32676
     return X/X[np.argmax(np.fabs(X))]
 
 # get median
@@ -25,9 +23,9 @@ def median(x):
     x= np.sort(x)   # sort ascending
     return x[midx]  # return middle value
 
+#  median filter
 def median_filter(x):
     n = len(x)  # length of x
-    
     for i in range(2, n-2): 
         x[i] = median(x[i-2:i+3])   # select slide window = 5
         
@@ -47,19 +45,16 @@ def median_filter(x):
     #     x[i] = median(x[i-6: i+1])
     return x
 
-def downsample(x, i):
-    return x[::i]
-    
+# get mean data
 def mean(x):
     return np.sum(x)/x.shape[0]
 
+# get standard deviation data
 def stand(x):
     y = mean(x)
     return np.sqrt(np.sum((x-y)**2)/(x.shape[0]))
 
-# def sgn(x):
-    
-
+# get short term energy of signal
 def ShortTermEnergy(X, Fs, frame_size, frame_shift):
     sample_shift = int(frame_shift*Fs)
     window_length = int(frame_size*Fs)
@@ -69,14 +64,8 @@ def ShortTermEnergy(X, Fs, frame_size, frame_shift):
         summ = np.sum(X[(i*sample_shift):(i*sample_shift) + window_length]**2)
         STE.append(summ)
     return np.array(STE).astype(float)
-
-# def ZeroCrosingRate(X, Fs, frame_size, frame_shift):
-#     X = 
-#     sample_shift = int(frame_shift*Fs)
-#     window_length = int(frame_size*Fs)
-#     ZCR = []
     
-
+# get frame speech
 def SegmentSpeech(X, Fs, frame_size, frame_shift, threshold):
     STE = ShortTermEnergy(X, Fs, frame_size, frame_shift)
     STE = normalize(STE)
@@ -87,15 +76,16 @@ def SegmentSpeech(X, Fs, frame_size, frame_shift, threshold):
     for i in range(6, len(STE)-6):
         if np.any(SEG[i-6:i] == 1) and np.any(SEG[i:i+7] == 1):
             SEG[i] = 1
-    speech_segment = []
+    speech_segment = [] 
     speech = []
     for j in range(len(SEG) - 1):
         if (SEG[j] == 0 and SEG[j + 1] == 1) or (SEG[j] == 1 and SEG[j+1] == 0):
             speech_segment.append(j+1)
         if (SEG[j] == 1):
             speech.append(j)
-    return np.array(speech),np.array(speech_segment).reshape((-1, 2))
+    return np.array(speech), np.array(speech_segment).reshape((-1, 2))
 
+# get region speech, silence, F, Fst from file .lab
 def read_result(x):
     f = open(x, 'r', encoding = 'utf-8')
     r = f.readlines()
@@ -110,6 +100,7 @@ def read_result(x):
     sil = np.delete(V, np.where(V[:,2]!='sil'), axis=0)[:,:-1]  # silence region 
     return v.astype(float), sil.astype(float), F
 
+# detect threshold by binary search
 def detect_threshold_STE(X, Y, Fs, frame_size, frame_shift):
     sample_shift = int(frame_shift*Fs)
     window_length = int(frame_size*Fs)
@@ -119,10 +110,13 @@ def detect_threshold_STE(X, Y, Fs, frame_size, frame_shift):
     v = ((v*Fs)/(sample_shift)).astype(int).reshape(-1)
     s = ((s*Fs)/(sample_shift)).astype(int).reshape(-1)
     s[-1] = s[-1] - window_length/ sample_shift - 1
-    # print(STE)
+    
+    # initial f and g
+    # f contains lower band
+    # g contains upper band
     f = np.array([], dtype=int)
     g = np.array([], dtype=int)
-    # initial f and g
+    
     for i in range(int(s.size/2)):  
         f = np.append(f, np.arange(s[i*2], s[i*2 + 1] + 1))
     for i in range(int(v.size/2)):
@@ -141,7 +135,6 @@ def detect_threshold_STE(X, Y, Fs, frame_size, frame_shift):
         i = sum(1 for ste in f if ste < Tmid)
         p = sum(1 for ste in g if ste > Tmid)
         if i != j or p != q:
-            # print(np.maximum(f-Tmid, 0))
             value = np.sum(np.maximum(f - Tmid, 0))/f.size - np.sum(np.maximum(Tmid - g, 0))/g.size
         else:
             break
@@ -153,6 +146,7 @@ def detect_threshold_STE(X, Y, Fs, frame_size, frame_shift):
         q = p
     return Tmid
 
+# get threshold from 4 train_signal
 def detect_threshold_mean_STE(frame_size, frame_shift):
     PATH_X = 'train_signal/X'
     PATH_Y = 'train_signal/Y'
@@ -175,6 +169,7 @@ def detect_threshold_mean_STE(frame_size, frame_shift):
     print('Ngưỡng được chọn: ' + str(min_thresholds) + ' - ' + str(max_thresholds))
     print('\n\n')
 
+# analyze ste from 4 file test_signal 
 def analytics_STE(frame_size, frame_shift):
     PATH_X = 'test_signal/X'
     PATH_Y = 'test_signal/Y'
@@ -183,7 +178,6 @@ def analytics_STE(frame_size, frame_shift):
     for i in range(len(FILE_X)):
         Fs, X = wavfile.read(PATH_X + '/' + FILE_X[i])
         sample_shift = int(frame_shift*Fs)
-        window_length = int(frame_size*Fs)
         X = normalize(X)
         v, s, F = read_result(PATH_Y + '/' + FILE_Y[i])
         v = ((v*Fs)/(sample_shift)).astype(int)
@@ -218,30 +212,36 @@ def findPeak(dfft, idx):
                 return i + 3
 
 def ACF(X, W, t, lag):
+    # Autocorrelation
     # return np.sum(
     #         X[t : t + W - 1 - lag] *
     #         X[lag + t : lag + t + W - 1 - lag]
     #         )
+    
+    # Normalize autocorrelation
     return np.sum(
             X[t : t + W - 1 - lag] *
             X[lag + t : lag + t + W - 1 - lag]
             )/np.sqrt((np.sum(X[t : t + W - 1 - lag]**2))*(np.sum(X[lag + t : lag + t + W - 1 - lag]**2)))
-    
+   
+# get envelope spectrum
 def envelope_spectrum(peaks, dftx):
+    # dftx: spectrum from rfft frame signal*w
+    # peaks: peaks of spectrum from dftx
+    
     u_x = np.array([0])
     u_y = np.array(dftx[0])
-    
     u_x = np.append(u_x,peaks)
     u_y = np.append(u_y,dftx[peaks])
     u_x = np.append(u_x, dftx.size - 1)
     u_y = np.append(u_y, 0)
     
+    # use interpolation to get envelope
     env = np.interp(np.arange(dftx.size), u_x, u_y)
     return env
 
     
 def detect_pitch_ACF(X, Fs, Fmin, Fmax, frame_size, frame_shift, speech_segment, N_FFT):
-    # N_FFT = 1024*20
     resolution = Fs/N_FFT
     sample_shift = int(frame_shift*Fs)
     window_length = int(frame_size*Fs)
@@ -255,31 +255,31 @@ def detect_pitch_ACF(X, Fs, Fmin, Fmax, frame_size, frame_shift, speech_segment,
         bounds = [0, int(Fmax/resolution) * 2]
         dftx = np.abs(rfft(x, N_FFT))
         dftx = normalize(dftx)
-        dfft = np.copy(dftx[:])
+        # dfft = np.copy(dftx[:])
         
+        # Compute crossing-rate spectrum
         peaks_dftx = find_peaks(dftx,height= 0.02 ,distance=Fmin/resolution+1, prominence = 0.03)
         np.diff(peaks_dftx[0])
+        # envelope spectrum
         env = envelope_spectrum(peaks_dftx[0], dftx)        
         g = np.sum(dftx * env)/np.sum(env * env)
         dftx = dftx - g*env
-        
+        # apply normalize Autocorrelation
         ACF_vals = normalize(np.array([ACF(dftx, dftx.size, 0, l) for l in range(*bounds)]))
         peaks_ACF = find_peaks(ACF_vals)
 
-        
-        # break
         if len(peaks_ACF[0]) != 0:
             F0 = freq[peaks_ACF[0][0]] 
         else:
             F0 = freq[0]
-        
         F00.append([speech_segment[i], F0])
+        
+        # plot
         # plt.figure(figsize=(30, 15))
         # plt.subplot(2, 1, 1)
-        # l1, = plt.plot(freq[:1500], dftx[:1500], label= 'sdfsd')
-        # l2, = plt.plot(freq[:1500], dfft[:1500], '-')
-        # l3, = plt.plot(freq[:1500], env[:1500])
-        
+        # l1, = plt.plot(freq[:800], dftx[:800], label= 'sdfsd')
+        # l2, = plt.plot(freq[:800], dfft[:800], '-')
+        # l3, = plt.plot(freq[:800], env[:800])
         # plt.legend((l1,l2,l3), ["zero-crossing spectrum", "spectrum", "envelope spectrum"], prop= {'size': 15})
         # plt.title("Analytics spectrum", fontsize = 15)
         # plt.xlabel("Hz", fontsize = 15)
@@ -290,12 +290,13 @@ def detect_pitch_ACF(X, Fs, Fmin, Fmax, frame_size, frame_shift, speech_segment,
         # plt.title("Spectral Autocorrelation", fontsize = 5)
         # plt.xlabel("Lag", fontsize = 15)
         # plt.ylabel("Magnitude", fontsize = 15)
-        # break
+        
     F00 = np.array(F00)
     F00[:,1] = median_filter(F00[:,1])
         
     return np.array(F00)
 
+# get a sample fft to plot
 def intermediate_frame(X, Fs, N_FFT, frame_size, frame_shift, speech_segment, Fmin, Fmax):
     resolution = Fs/N_FFT
     sample_shift = int(frame_shift*Fs)
@@ -324,7 +325,7 @@ if __name__ == '__main__':
     frame_shift = 10/1000
     frame_size = 20/1000
     threshold = 0.0024
-    N_FFT = 1024*8
+    N_FFT = 1024*2
     Fmin = 70
     Fmax = 400
         
@@ -439,29 +440,6 @@ if __name__ == '__main__':
     #     plt.axvline(tt[speech_segment][i], color='b', linestyle=':', linewidth=2)
     # plt.show()
     # PlotfftFram(X, Fs, frame_size, frame_shift)
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    # # sd.play(y, Fs)
-    
-    # y = normalize(y)
-    
-    # plt.figure(figsize=(40, 20))
-    # plt.subplot(2, 1, 1)
-    # plt.plot(t[:nSamples], y[:nSamples])
-    # N_FFT = 1024
-    # dfty = np.abs(fft(y, N_FFT))
-    # tt = np.linspace(0,Fs, num= N_FFT)
-    # plt.subplot(2,1,2)
-    # plt.plot(tt[:int(N_FFT/2 + 1)], dfty[:int(N_FFT/2 + 1)])
 
 
 

@@ -51,12 +51,20 @@ if __name__ == '__main__':
                 ae *= frame_shift
             print('Sai số tuyệt đối giữa các biên: ' + str(ae) + ' ms')
         
+        F_delta = math.fabs(float(f[1][1])-F)
+        Fstd_delta = math.fabs(float(f[0][1]) - Fstd)
+        _F = (F_delta/F)*100
+        _Fstd = (Fstd_delta/Fstd)*100
+        
         print('Câu 2: Tìm tần số')
         print('F lab: ' + str(f[1][1]))
         print('Fstd lab: '+ str(f[0][1]))
         print('F tìm được: ' + str(F))
         print('Fstd: ' + str(Fstd))
-        print('delta: ' + str(math.fabs(float(f[1][1])-F)))
+        print('delta: ' + str(F_delta))
+        print('Sai số tương đối của F: ' + str(_F) + '%')
+        print('Sai số tương đối của Fstd: ' + str(_Fstd) + '%')
+        print('\n')
         
         t = np.linspace(0, len(X)/Fs, num = len(X))
         tt = np.linspace(0, len(X)/Fs, num = len(STE))
