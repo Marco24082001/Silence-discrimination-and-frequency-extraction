@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import math
 from scipy.io import wavfile
 import os
-from automatic_processing_signal import read_result, normalize, mean, detect_pitch_ACF, detect_threshold_mean_STE, ShortTermEnergy, SegmentSpeech, intermediate_frame, mean, stand
+from automatic_processing_signal import read_result, normalize, detect_pitch_ACF, detect_threshold_mean_STE, ShortTermEnergy, SegmentSpeech, intermediate_frame, mean, stand
 
 if __name__ == '__main__':
     PATH_X = 'test_signal/X'
@@ -19,19 +19,20 @@ if __name__ == '__main__':
     FILE_Y = os.listdir(PATH_Y)
     frame_shift = 10/1000
     frame_size = 20/1000
-    threshold = 0.0024
     N_FFT = 1024 * 8
     Fmin = 70
     Fmax = 400
-    detect_threshold_mean_STE(frame_size, frame_shift)
+    # threshold = 0.0024
+    threshold = detect_threshold_mean_STE(frame_size, frame_shift)
 
     for i in range(len(FILE_X)):
         Fs, X = wavfile.read(PATH_X + '/' + FILE_X[i])
         X = normalize(X)
         STE = ShortTermEnergy(X, Fs, frame_size, frame_shift)
         STE = normalize(STE)
-        v, sil, f = read_result(PATH_Y + '/' + FILE_Y[i])
-        v = v.astype(float) * Fs
+        
+        v, s, f = read_result(PATH_Y + '/' + FILE_Y[i])
+        v = v * Fs
         v_segment = (v/(frame_shift*Fs)).astype(int)
         v = v_segment.reshape(-1)
         speech, speech_segment = SegmentSpeech(X, Fs, frame_size, frame_shift, threshold)
@@ -40,8 +41,9 @@ if __name__ == '__main__':
         _ = np.zeros((len(X)))
         F00 = detect_pitch_ACF(X, Fs, Fmin, Fmax, frame_size, frame_shift, speech, N_FFT)
         F00[:,0] = F00[:,0]*frame_shift
-        F = np.mean(F00[:,1])
+        F = mean(F00[:,1])
         Fstd = stand(F00[:,1])
+        
         print(FILE_X[i])
         print('Câu 1: Tìm biên nguyên âm')
         if v_segment.size == speech_segment.size:
@@ -70,13 +72,12 @@ if __name__ == '__main__':
         tt = np.linspace(0, len(X)/Fs, num = len(STE))
         ttt = speech*(frame_shift*Fs)/Fs
         speech_segment = speech_segment.reshape(-1)
-        plt.figure(figsize=(40, 40))
+        plt.figure(figsize=(10, 5))
         
         plt.subplot(2, 2, 1)
         plt.title("Energy-based Speech/Silence discrimination")
         plt.plot(t, X)
         plt.plot(tt, STE, '-')
-        # plt.plot(ttt, F00/100, '.')
         
         for i in range(tt[speech_segment].shape[0]):
             if i != 0:
@@ -141,10 +142,11 @@ if __name__ == '__main__':
         # plt.xlabel("Time")
         # plt.ylabel("Hz")
         
-        plt.subplots_adjust(left=0.1,
-                    bottom=0.1, 
-                    right=0.9, 
-                    top=0.9, 
-                    wspace=0.4, 
-                    hspace=0.4)
+        # plt.subplots_adjust(left=0.1,
+        #             bottom=0.1, 
+        #             right=0.9, 
+        #             top=0.9, 
+        #             wspace=0.4, 
+        #             hspace=0.4)
+        plt.tight_layout(h_pad=0.544, w_pad=0.221)
         plt.show()

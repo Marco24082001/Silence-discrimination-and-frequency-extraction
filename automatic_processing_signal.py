@@ -168,6 +168,7 @@ def detect_threshold_mean_STE(frame_size, frame_shift):
     print('Độ lệch chuẩn của ngưỡng: ', thresholds_std)
     print('Ngưỡng được chọn: ' + str(min_thresholds) + ' - ' + str(max_thresholds))
     print('\n\n')
+    return thresholds_mean
 
 # analyze ste from 4 file test_signal 
 def analytics_STE(frame_size, frame_shift):
